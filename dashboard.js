@@ -154,8 +154,10 @@ async function calculatePUB(forceUpdate = false) {
     return;
   }
 
-  if (pubStart.getMonth() === pubEnd.getMonth() &&
-      pubStart.getFullYear() === pubEnd.getFullYear()) {
+  if (
+    pubStart.getMonth() === pubEnd.getMonth() &&
+    pubStart.getFullYear() === pubEnd.getFullYear()
+  ) {
     alert("Start and end date must be in different months.");
     return;
   }
@@ -173,7 +175,7 @@ async function calculatePUB(forceUpdate = false) {
     return;
   }
 
-  // Save to DB
+  // Save PUB bill to DB
   if (existingPub.length === 0) {
     await supabaseClient.from("pub_bills").insert({
       amount,
@@ -184,79 +186,70 @@ async function calculatePUB(forceUpdate = false) {
 
   const { data: tenants } = await supabaseClient.from("tenants").select("*");
 
-  // Filter tenants who are present for any portion of the billing period
-  const activeTenants = tenants.filter(t => {
+  // Filter tenants who were present during the PUB billing window
+  const activeTenants = tenants.filter((t) => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
     return moveIn <= pubEnd && (!moveOut || moveOut >= pubStart);
   });
 
+  // Determine rent period from 1st to last day of the PUB month
   const rentStart = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
   const rentDays = dateDiffInDays(rentStart, rentEnd);
 
-  const pubDays = dateDiffInDays(pubStart, pubEnd);
   const monthKey = `${pubStart.getFullYear()}-${String(pubStart.getMonth() + 1).padStart(2, '0')}`;
   const monthLabel = formatMonthYear(pubStart);
-
+  const summaryList = [];
   let summary = `📊 Monthly Contribution Summary\n\n`;
-  let pubSplitTenants = [];
 
-  activeTenants.forEach(t => {
+  const pubSplitTenants = activeTenants.filter(t => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
-
-    // Determine overlap period with PUB window
     const overlapStart = moveIn > pubStart ? moveIn : pubStart;
     const overlapEnd = moveOut && moveOut < pubEnd ? moveOut : pubEnd;
-
-    if (overlapStart > overlapEnd) return; // No overlap
-
-    pubSplitTenants.push({
-      ...t,
-      overlapStart,
-      overlapEnd
-    });
+    return overlapStart <= overlapEnd;
   });
 
   const pubPerTenant = amount / pubSplitTenants.length;
 
-  const summaries = pubSplitTenants.map(t => {
+  pubSplitTenants.forEach((t) => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
 
-    let rentActiveDays = rentDays;
-    if (moveIn > rentStart) rentActiveDays = dateDiffInDays(moveIn, rentEnd);
-    if (moveOut && moveOut < rentEnd) rentActiveDays = dateDiffInDays(rentStart, moveOut);
-    if (moveIn > rentEnd || (moveOut && moveOut < rentStart)) rentActiveDays = 0;
-
+    const actualStart = moveIn > rentStart ? moveIn : rentStart;
+    const actualEnd = moveOut && moveOut < rentEnd ? moveOut : rentEnd;
+    const rentActiveDays = actualEnd >= actualStart ? dateDiffInDays(actualStart, actualEnd) : 0;
     const rentShare = (t.rent * rentActiveDays) / rentDays;
+
     const total = rentShare + pubPerTenant;
 
     summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubPerTenant.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
 
-    return {
+    summaryList.push({
       name: t.name,
       rentShare: rentShare.toFixed(2),
       pubShare: pubPerTenant.toFixed(2),
       total: total.toFixed(2),
-      month: monthLabel
-    };
+      month: monthLabel,
+    });
   });
 
   document.getElementById("summary-output").textContent = summary;
+  contributionSummaries[monthKey] = summaryList;
 
-  // Populate for history
-  contributionSummaries[monthKey] = summaries;
-
-  // Update dropdown only if new month
-  if (!Array.from(document.getElementById("month-filter").options).some(opt => opt.value === monthKey)) {
-    document.getElementById("month-filter").innerHTML += `<option value="${monthKey}">${monthLabel}</option>`;
+  // Add to dropdown if new
+  const monthFilter = document.getElementById("month-filter");
+  if (![...monthFilter.options].some((opt) => opt.value === monthKey)) {
+    monthFilter.innerHTML += `<option value="${monthKey}">${monthLabel}</option>`;
   }
 
+  // Auto-select current month and render
+  monthFilter.value = monthKey;
   renderFilteredSummary();
   fetchPUBHistory();
 }
+
 
 
 function renderFilteredSummary() {
