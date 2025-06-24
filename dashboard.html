@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dashboard | BLK 453</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -15,14 +14,18 @@
   <div class="main-content">
     <section class="section">
       <h2>Tenant Management</h2>
-      <div id="tenant-form">
-        <input type="text" id="tenant-name" placeholder="Tenant Name" />
-        <input type="number" id="tenant-rent" placeholder="Rent Amount (SGD)" />
-        <input type="date" id="tenant-movein" />
-        <input type="date" id="tenant-moveout" />
-        <button onclick="addTenant()">Add Tenant</button>
-      </div>
-      <table id="tenant-table"></table>
+      <table id="tenant-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Rent (SGD)</th>
+            <th>Move-In</th>
+            <th>Move-Out</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tenant-body"></tbody>
+      </table>
     </section>
 
     <section class="section">
@@ -36,7 +39,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.6/dist/umd/supabase.min.js"></script>
-  <script src="app.js"></script>
+  <script src="supabaseClient.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
