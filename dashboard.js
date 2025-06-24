@@ -27,10 +27,26 @@ async function fetchTenants() {
       <td contenteditable="true" data-field="rent" data-id="${t.id}">${t.rent}</td>
       <td contenteditable="true" data-field="move_in" data-id="${t.id}">${t.move_in}</td>
       <td contenteditable="true" data-field="move_out" data-id="${t.id}">${t.move_out ?? ''}</td>
-      <td><button onclick="saveRow(this, '${t.id}')">Save</button></td>
+      <td>
+        <button onclick="saveRow(this, '${t.id}')">Save</button>
+        <button onclick="deleteTenant('${t.id}')">Delete</button>
+      </td>
     `;
     tbody.appendChild(row);
   });
+}
+
+async function addTenant() {
+  const name = document.getElementById('new-name').value.trim();
+  const rent = parseFloat(document.getElementById('new-rent').value);
+  const move_in = document.getElementById('new-movein').value;
+  const move_out = document.getElementById('new-moveout').value || null;
+
+  if (!name || isNaN(rent) || !move_in) return alert('Missing required fields');
+
+  const { error } = await supabaseClient.from('tenants').insert({ name, rent, move_in, move_out });
+  if (error) return console.error(error);
+  fetchTenants();
 }
 
 async function saveRow(button, id) {
@@ -45,6 +61,13 @@ async function saveRow(button, id) {
   const { error } = await supabaseClient.from('tenants').update(updated).eq('id', id);
   if (error) return console.error('Error saving:', error);
   alert('Saved!');
+}
+
+async function deleteTenant(id) {
+  if (!confirm('Delete this tenant?')) return;
+  const { error } = await supabaseClient.from('tenants').delete().eq('id', id);
+  if (error) return console.error(error);
+  fetchTenants();
 }
 
 async function calculatePUB() {
@@ -98,6 +121,28 @@ async function calculatePUB() {
   });
 
   document.getElementById("summary-output").textContent = summary;
+  fetchPUBHistory();
 }
 
-window.onload = fetchTenants;
+async function fetchPUBHistory() {
+  const { data: bills, error } = await supabaseClient.from('pub_bills').select('*').order('start_date', { ascending: false });
+  if (error) return console.error(error);
+
+  const tbody = document.getElementById('pub-history-body');
+  tbody.innerHTML = '';
+
+  bills.forEach(b => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>SGD ${b.amount.toFixed(2)}</td>
+      <td>${b.start_date}</td>
+      <td>${b.end_date}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+window.onload = () => {
+  fetchTenants();
+  fetchPUBHistory();
+};
