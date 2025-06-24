@@ -1,16 +1,19 @@
-const supabase = supabase.createClient(
-  'https://cnxoktpvkpqpbrsxwmbp.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNueG9rdHB2a3BxcGJyc3h3bWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDk1MzksImV4cCI6MjA2NjMyNTUzOX0.TCgBy1_EBD3JoOYYCat8MEgnlLwtrOSpunlDzRZVVTQ'
+const { createClient } = supabase;
+const supabaseUrl = 'https://cnxoktpvkpqpbrsxwmbp.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNueG9rdHB2a3BxcGJyc3h3bWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDk1MzksImV4cCI6MjA2NjMyNTUzOX0.TCgBy1_EBD3JoOYYCat8MEgnlLwtrOSpunlDzRZVVTQ';
+const supabaseClient  = supabase.createClient(
+  supabaseUrl,
+  supabaseKey
 );
 
 // Redirect if not logged in
-supabase.auth.getSession().then(({ data: { session } }) => {
+supabaseClient.auth.getSession().then(({ data: { session } }) => {
   if (!session) window.location.href = 'index.html';
 });
 
 // Logout button
 document.getElementById('logout-btn').addEventListener('click', async () => {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   localStorage.removeItem('supabaseSession');
   window.location.href = 'index.html';
 });
