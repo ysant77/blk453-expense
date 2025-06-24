@@ -55,12 +55,48 @@ async function addTenant() {
   const move_in = document.getElementById('new-movein').value;
   const move_out = document.getElementById('new-moveout').value || null;
 
-  if (!name || isNaN(rent) || !move_in) return alert('Missing required fields');
+  if (!name || isNaN(rent) || !move_in) {
+    alert('Name, Rent, and Move-In are required!');
+    return;
+  }
 
-  const { error } = await supabaseClient.from('tenants').insert({ name, rent, move_in, move_out });
-  if (error) return console.error(error);
+  const { data: existing, error: checkError } = await supabaseClient
+    .from("tenants")
+    .select("*")
+    .eq("name", name);
+
+  if (checkError) return console.error(checkError);
+  if (existing.length > 0) {
+    alert("Tenant with this name already exists.");
+    return;
+  }
+
+  await supabaseClient.from('tenants').insert({ name, rent, move_in, move_out });
+
+  alert("Tenant added!");
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-rent').value = '';
+  document.getElementById('new-movein').value = '';
+  document.getElementById('new-moveout').value = '';
+
   fetchTenants();
+
+  // 🔁 Recalculate PUB if tenant is added during current cycle
+  const now = new Date();
+  const { data: bills } = await supabaseClient.from('pub_bills').select('*');
+  const activeBill = bills.find(b => {
+    const s = new Date(b.start_date);
+    const e = new Date(b.end_date);
+    return now >= s && now <= e;
+  });
+  if (activeBill) {
+    document.getElementById("pub-amount").value = activeBill.amount;
+    document.getElementById("pub-start").value = activeBill.start_date;
+    document.getElementById("pub-end").value = activeBill.end_date;
+    calculatePUB();
+  }
 }
+
 
 async function saveRow(button, id) {
   const row = button.closest('tr');
@@ -84,60 +120,74 @@ async function deleteTenant(id) {
 }
 
 async function calculatePUB() {
-  const pubAmount = parseFloat(document.getElementById("pub-amount").value);
-  const pubStart = new Date(document.getElementById("pub-start").value);
-  const pubEnd = new Date(document.getElementById("pub-end").value);
+  const amount = parseFloat(document.getElementById("pub-amount").value);
+  const start = document.getElementById("pub-start").value;
+  const end = document.getElementById("pub-end").value;
 
-  const insert = await supabaseClient.from('pub_bills').insert({
-    amount: pubAmount,
-    start_date: pubStart.toISOString().split('T')[0],
-    end_date: pubEnd.toISOString().split('T')[0]
+  if (!amount || !start || !end) {
+    alert("All PUB fields are required!");
+    return;
+  }
+
+  const pubStart = new Date(start);
+  const pubEnd = new Date(end);
+  const today = new Date();
+
+  // check for duplicate PUB bill
+  const { data: existingPub, error: dupCheckError } = await supabaseClient
+    .from("pub_bills")
+    .select("*")
+    .eq("start_date", start)
+    .eq("end_date", end);
+
+  if (dupCheckError) return console.error(dupCheckError);
+  if (existingPub.length > 0) {
+    alert("PUB bill for this date range already exists.");
+    return;
+  }
+
+  await supabaseClient.from("pub_bills").insert({
+    amount,
+    start_date: start,
+    end_date: end,
   });
 
-  if (insert.error) return console.error(insert.error);
+  const { data: tenants } = await supabaseClient.from("tenants").select("*");
 
-  const { data: tenants, error } = await supabaseClient.from('tenants').select('*');
-  if (error) return console.error(error);
+  const activeTenants = tenants.filter(t => {
+    const moveIn = new Date(t.move_in);
+    const moveOut = t.move_out ? new Date(t.move_out) : null;
 
-  const pubDays = dateDiffInDays(pubStart, pubEnd);
+    return moveIn <= pubEnd && (!moveOut || moveOut >= pubStart);
+  });
+
+  const pubPerTenant = amount / activeTenants.length;
+
   const rentStart = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
   const rentDays = dateDiffInDays(rentStart, rentEnd);
 
-  let summary = `🏠 Monthly Contribution Summary:\n\n`;
+  let summary = `📊 Monthly Contribution Summary\n\n`;
 
-  const shares = tenants.map(t => {
+  activeTenants.forEach((t) => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
 
-    let pubDaysActive = pubDays;
-    if (moveIn > pubStart) pubDaysActive = dateDiffInDays(moveIn, pubEnd);
-    if (moveOut && moveOut < pubEnd) pubDaysActive = dateDiffInDays(pubStart, moveOut);
-    if (moveIn > pubEnd || (moveOut && moveOut < pubStart)) pubDaysActive = 0;
+    let rentActiveDays = rentDays;
+    if (moveIn > rentStart) rentActiveDays = dateDiffInDays(moveIn, rentEnd);
+    if (moveOut && moveOut < rentEnd) rentActiveDays = dateDiffInDays(rentStart, moveOut);
+    if (moveIn > rentEnd || (moveOut && moveOut < rentStart)) rentActiveDays = 0;
 
-    let rentDaysActive = rentDays;
-    if (moveIn > rentStart) rentDaysActive = dateDiffInDays(moveIn, rentEnd);
-    if (moveOut && moveOut < rentEnd) rentDaysActive = dateDiffInDays(rentStart, moveOut);
-    if (moveIn > rentEnd || (moveOut && moveOut < rentStart)) rentDaysActive = 0;
+    const rentShare = (t.rent * rentActiveDays) / rentDays;
+    const total = rentShare + pubPerTenant;
 
-    const pubShare = pubAmount * (pubDaysActive / pubDays);
-    const rentShare = parseFloat(t.rent) * (rentDaysActive / rentDays);
-
-    return {
-      name: t.name,
-      rent: rentShare,
-      pub: pubShare,
-      total: rentShare + pubShare
-    };
-  });
-
-  shares.forEach(s => {
-    summary += `- ${s.name}: Rent SGD ${s.rent.toFixed(2)} + PUB SGD ${s.pub.toFixed(2)} = SGD ${s.total.toFixed(2)}\n`;
+    summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubPerTenant.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
   });
 
   document.getElementById("summary-output").textContent = summary;
   fetchPUBHistory();
 }
+
 
 async function fetchPUBHistory() {
   const { data: bills, error } = await supabaseClient.from('pub_bills').select('*').order('start_date', { ascending: false });

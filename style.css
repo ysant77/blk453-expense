@@ -94,7 +94,7 @@ input, button {
 } */
 
 
-body {
+/* body {
   margin: 0;
   padding: 0;
   font-family: 'Segoe UI', sans-serif;
@@ -201,5 +201,132 @@ td button {
   border-radius: 6px;
   margin-top: 1em;
   white-space: pre-wrap;
+  border: 1px solid #ddd;
+} */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f5f7fa;
+  color: #222;
+}
+
+h1, h2, h4 {
+  margin-bottom: 0.5em;
+}
+
+input, button {
+  font-family: inherit;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="date"] {
+  padding: 0.6em;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  margin: 0.3em;
+  width: fit-content;
+  min-width: 140px;
+}
+
+button {
+  padding: 0.6em 1.2em;
+  background-color: #007aff;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0.3em;
+}
+
+button:hover {
+  background-color: #005fd1;
+}
+
+button.danger {
+  background-color: #ff4d4f;
+}
+
+button.danger:hover {
+  background-color: #d9363e;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1em 2em;
+  background-color: #007aff;
+  color: white;
+  align-items: center;
+}
+
+#logout-btn {
+  background-color: white;
+  color: #007aff;
+  font-weight: bold;
+  border-radius: 6px;
+}
+
+.section {
+  padding: 1.5em 2em;
+  margin: 1em;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#tenant-add-form,
+#pub-bill-form {
+  margin-bottom: 1em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: center;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+}
+
+th, td {
+  border: 1px solid #eee;
+  padding: 0.75em;
+  text-align: left;
+}
+
+th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+td button {
+  margin-right: 0.5em;
+}
+
+.summary-box {
+  background-color: #f4f6f8;
+  border-left: 5px solid #007aff;
+  padding: 1em;
+  margin-top: 1em;
+  border-radius: 6px;
+}
+
+.summary-box h4 {
+  margin-bottom: 0.5em;
+  color: #007aff;
+}
+
+#summary-output {
+  background: #ffffff;
+  padding: 1em;
+  white-space: pre-wrap;
+  border-radius: 5px;
   border: 1px solid #ddd;
 }
