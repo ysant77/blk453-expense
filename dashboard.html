@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard | BLK 453</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="header">
+    <h1>BLK 453, 09-125 Expense Management</h1>
+    <button id="logout-btn">Logout</button>
+  </div>
+
+  <div class="main-content">
+    <section class="section">
+      <h2>Tenant Management</h2>
+      <div id="tenant-form">
+        <input type="text" id="tenant-name" placeholder="Tenant Name" />
+        <input type="number" id="tenant-rent" placeholder="Rent Amount (SGD)" />
+        <input type="date" id="tenant-movein" />
+        <input type="date" id="tenant-moveout" />
+        <button onclick="addTenant()">Add Tenant</button>
+      </div>
+      <table id="tenant-table"></table>
+    </section>
+
+    <section class="section">
+      <h2>PUB Bill Calculation</h2>
+      <input type="number" id="pub-amount" placeholder="Total PUB Bill (SGD)" />
+      <input type="date" id="pub-start" />
+      <input type="date" id="pub-end" />
+      <button onclick="calculatePUB()">Calculate & Save</button>
+      <pre id="summary-output"></pre>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.6/dist/umd/supabase.min.js"></script>
+  <script src="app.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
