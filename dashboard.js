@@ -13,6 +13,13 @@ function dateDiffInDays(a, b) {
   return Math.floor((b - a) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+let contributionSummaries = {}; // key = YYYY-MM -> array of tenant summaries
+
+function formatMonthYear(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
 async function fetchTenants() {
   const { data: tenants, error } = await supabaseClient.from('tenants').select('*');
   if (error) return console.error(error);
@@ -79,24 +86,18 @@ async function addTenant() {
   document.getElementById('new-movein').value = '';
   document.getElementById('new-moveout').value = '';
 
-  fetchTenants();
+  await fetchTenants();
 
-  // 🔁 Recalculate PUB if tenant is added during current cycle
-  const now = new Date();
+  const today = new Date().toISOString().split("T")[0];
   const { data: bills } = await supabaseClient.from('pub_bills').select('*');
-  const activeBill = bills.find(b => {
-    const s = new Date(b.start_date);
-    const e = new Date(b.end_date);
-    return now >= s && now <= e;
-  });
+  const activeBill = bills.find(b => today >= b.start_date && today <= b.end_date);
   if (activeBill) {
     document.getElementById("pub-amount").value = activeBill.amount;
     document.getElementById("pub-start").value = activeBill.start_date;
     document.getElementById("pub-end").value = activeBill.end_date;
-    calculatePUB();
+    await calculatePUB(true);
   }
 }
-
 
 async function saveRow(button, id) {
   const row = button.closest('tr');
@@ -119,7 +120,7 @@ async function deleteTenant(id) {
   fetchTenants();
 }
 
-async function calculatePUB() {
+async function calculatePUB(forceUpdate = false) {
   const amount = parseFloat(document.getElementById("pub-amount").value);
   const start = document.getElementById("pub-start").value;
   const end = document.getElementById("pub-end").value;
@@ -131,9 +132,7 @@ async function calculatePUB() {
 
   const pubStart = new Date(start);
   const pubEnd = new Date(end);
-  const today = new Date();
 
-  // check for duplicate PUB bill
   const { data: existingPub, error: dupCheckError } = await supabaseClient
     .from("pub_bills")
     .select("*")
@@ -141,23 +140,24 @@ async function calculatePUB() {
     .eq("end_date", end);
 
   if (dupCheckError) return console.error(dupCheckError);
-  if (existingPub.length > 0) {
+  if (existingPub.length > 0 && !forceUpdate) {
     alert("PUB bill for this date range already exists.");
     return;
   }
 
-  await supabaseClient.from("pub_bills").insert({
-    amount,
-    start_date: start,
-    end_date: end,
-  });
+  if (existingPub.length === 0) {
+    await supabaseClient.from("pub_bills").insert({
+      amount,
+      start_date: start,
+      end_date: end,
+    });
+  }
 
   const { data: tenants } = await supabaseClient.from("tenants").select("*");
 
   const activeTenants = tenants.filter(t => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
-
     return moveIn <= pubEnd && (!moveOut || moveOut >= pubStart);
   });
 
@@ -167,9 +167,15 @@ async function calculatePUB() {
   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
   const rentDays = dateDiffInDays(rentStart, rentEnd);
 
-  let summary = `📊 Monthly Contribution Summary\n\n`;
+  const monthKey = `${pubStart.getFullYear()}-${String(pubStart.getMonth() + 1).padStart(2, '0')}`;
+  const monthLabel = formatMonthYear(pubStart);
 
-  activeTenants.forEach((t) => {
+  if (!contributionSummaries[monthKey]) {
+    contributionSummaries[monthKey] = [];
+    document.getElementById("month-filter").innerHTML += `<option value="${monthKey}">${monthLabel}</option>`;
+  }
+
+  contributionSummaries[monthKey] = activeTenants.map(t => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
 
@@ -181,13 +187,44 @@ async function calculatePUB() {
     const rentShare = (t.rent * rentActiveDays) / rentDays;
     const total = rentShare + pubPerTenant;
 
-    summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubPerTenant.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
+    return {
+      name: t.name,
+      rentShare: rentShare.toFixed(2),
+      pubShare: pubPerTenant.toFixed(2),
+      total: total.toFixed(2),
+      month: monthLabel
+    };
+  });
+
+  let summary = `📊 Monthly Contribution Summary\n\n`;
+  contributionSummaries[monthKey].forEach(entry => {
+    summary += `👤 ${entry.name}\n  - Rent: SGD ${entry.rentShare}\n  - PUB:  SGD ${entry.pubShare}\n  - Total: SGD ${entry.total}\n\n`;
   });
 
   document.getElementById("summary-output").textContent = summary;
+  renderFilteredSummary();
   fetchPUBHistory();
 }
 
+function renderFilteredSummary() {
+  const selectedMonth = document.getElementById("month-filter").value;
+  const tbody = document.getElementById("summary-table-body");
+  tbody.innerHTML = '';
+
+  if (!selectedMonth || !contributionSummaries[selectedMonth]) return;
+
+  contributionSummaries[selectedMonth].forEach(entry => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${entry.month}</td>
+      <td>${entry.name}</td>
+      <td>${entry.rentShare}</td>
+      <td>${entry.pubShare}</td>
+      <td>${entry.total}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
 
 async function fetchPUBHistory() {
   const { data: bills, error } = await supabaseClient.from('pub_bills').select('*').order('start_date', { ascending: false });
