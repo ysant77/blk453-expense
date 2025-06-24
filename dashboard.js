@@ -23,17 +23,30 @@ async function fetchTenants() {
   tenants.forEach(t => {
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td contenteditable="true" data-field="name" data-id="${t.id}">${t.name}</td>
-      <td contenteditable="true" data-field="rent" data-id="${t.id}">${t.rent}</td>
-      <td contenteditable="true" data-field="move_in" data-id="${t.id}">${t.move_in}</td>
-      <td contenteditable="true" data-field="move_out" data-id="${t.id}">${t.move_out ?? ''}</td>
+      <td><span data-field="name" data-id="${t.id}">${t.name}</span></td>
+      <td><span data-field="rent" data-id="${t.id}">${t.rent}</span></td>
+      <td><span data-field="move_in" data-id="${t.id}">${t.move_in}</span></td>
+      <td><span data-field="move_out" data-id="${t.id}">${t.move_out ?? ''}</span></td>
       <td>
-        <button onclick="saveRow(this, '${t.id}')">Save</button>
-        <button onclick="deleteTenant('${t.id}')">Delete</button>
+        <button onclick="editRow(this, '${t.id}')">Edit</button>
+        <button class="danger" onclick="deleteTenant('${t.id}')">Delete</button>
       </td>
     `;
     tbody.appendChild(row);
   });
+}
+
+function editRow(button, id) {
+  const row = button.closest('tr');
+  row.querySelectorAll('span').forEach(span => {
+    const input = document.createElement('input');
+    input.value = span.textContent;
+    input.setAttribute('data-field', span.getAttribute('data-field'));
+    input.setAttribute('data-id', id);
+    span.replaceWith(input);
+  });
+  button.textContent = 'Save';
+  button.onclick = () => saveRow(button, id);
 }
 
 async function addTenant() {
@@ -52,15 +65,15 @@ async function addTenant() {
 async function saveRow(button, id) {
   const row = button.closest('tr');
   const updated = {};
-  ['name', 'rent', 'move_in', 'move_out'].forEach(field => {
-    const cell = row.querySelector(`[data-field='${field}']`);
-    updated[field] = cell.textContent.trim();
+  row.querySelectorAll('input').forEach(input => {
+    updated[input.getAttribute('data-field')] = input.value.trim();
   });
   if (!updated.move_out) updated.move_out = null;
 
   const { error } = await supabaseClient.from('tenants').update(updated).eq('id', id);
   if (error) return console.error('Error saving:', error);
   alert('Saved!');
+  fetchTenants();
 }
 
 async function deleteTenant(id) {
@@ -75,11 +88,13 @@ async function calculatePUB() {
   const pubStart = new Date(document.getElementById("pub-start").value);
   const pubEnd = new Date(document.getElementById("pub-end").value);
 
-  await supabaseClient.from('pub_bills').insert({
+  const insert = await supabaseClient.from('pub_bills').insert({
     amount: pubAmount,
     start_date: pubStart.toISOString().split('T')[0],
     end_date: pubEnd.toISOString().split('T')[0]
   });
+
+  if (insert.error) return console.error(insert.error);
 
   const { data: tenants, error } = await supabaseClient.from('tenants').select('*');
   if (error) return console.error(error);
@@ -137,9 +152,17 @@ async function fetchPUBHistory() {
       <td>SGD ${b.amount.toFixed(2)}</td>
       <td>${b.start_date}</td>
       <td>${b.end_date}</td>
+      <td><button class="danger" onclick="deletePUB('${b.id}')">Delete</button></td>
     `;
     tbody.appendChild(row);
   });
+}
+
+async function deletePUB(id) {
+  if (!confirm('Delete this PUB bill?')) return;
+  const { error } = await supabaseClient.from('pub_bills').delete().eq('id', id);
+  if (error) return console.error(error);
+  fetchPUBHistory();
 }
 
 window.onload = () => {
