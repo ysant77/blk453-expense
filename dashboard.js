@@ -105,13 +105,29 @@ async function saveRow(button, id) {
   row.querySelectorAll('input').forEach(input => {
     updated[input.getAttribute('data-field')] = input.value.trim();
   });
-  if (!updated.move_out) updated.move_out = null;
+
+  if (!updated.move_in) {
+    alert("Move-in date is required.");
+    return;
+  }
+
+  if (updated.move_out) {
+    const moveInDate = new Date(updated.move_in);
+    const moveOutDate = new Date(updated.move_out);
+    if (moveOutDate <= moveInDate) {
+      alert("Move-out date must be after move-in date.");
+      return;
+    }
+  } else {
+    updated.move_out = null;
+  }
 
   const { error } = await supabaseClient.from('tenants').update(updated).eq('id', id);
   if (error) return console.error('Error saving:', error);
   alert('Saved!');
   fetchTenants();
 }
+
 
 async function deleteTenant(id) {
   if (!confirm('Delete this tenant?')) return;
@@ -132,6 +148,17 @@ async function calculatePUB(forceUpdate = false) {
 
   const pubStart = new Date(start);
   const pubEnd = new Date(end);
+
+  if (pubEnd <= pubStart) {
+    alert("End date must be after start date.");
+    return;
+  }
+
+  if (pubStart.getMonth() === pubEnd.getMonth() &&
+      pubStart.getFullYear() === pubEnd.getFullYear()) {
+    alert("Start and end date must be in different months.");
+    return;
+  }
 
   const { data: existingPub, error: dupCheckError } = await supabaseClient
     .from("pub_bills")
