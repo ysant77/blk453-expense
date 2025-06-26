@@ -343,71 +343,24 @@ async function calculatePUB(forceUpdate = false) {
     return moveIn <= pubEnd && (!moveOut || moveOut >= pubStart);
   });
 
+  const pubDuration = dateDiffInDays(pubStart, pubEnd); // e.g., 30 days from Apr 14 to May 13
   const rentStart = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
-  const rentDays = dateDiffInDays(rentStart, rentEnd);
-  const pubDuration = dateDiffInDays(pubStart, pubEnd); // true total days of PUB billing
+  const rentDaysInMonth = dateDiffInDays(rentStart, rentEnd);
 
   const monthKey = `${pubStart.getFullYear()}-${String(pubStart.getMonth() + 1).padStart(2, '0')}`;
   const monthLabel = formatMonthYear(pubStart);
   const summaryList = [];
   let summary = `📊 Monthly Contribution Summary (${monthLabel})\n\n`;
 
-  let totalActiveDays = 0;
-  const tenantDays = [];
-
-  activeTenants.forEach(t => {
+  activeTenants.forEach((t) => {
     const moveIn = new Date(t.move_in);
     const moveOut = t.move_out ? new Date(t.move_out) : null;
     const overlapStart = moveIn > pubStart ? moveIn : pubStart;
     const overlapEnd = moveOut && moveOut < pubEnd ? moveOut : pubEnd;
-    const days = overlapEnd >= overlapStart ? dateDiffInDays(overlapStart, overlapEnd) : 0;
-    totalActiveDays += days;
-    tenantDays.push({ tenant: t, days });
-  });
 
-  // tenantDays.forEach(({ tenant: t, days }) => {
-  //   // const rent = parseFloat(t.rent) || 0;
-  //   const pubShare = days > 0 && totalActiveDays > 0 ? (amount * days) / totalActiveDays : 0;
-
-  //   // const actualStart = new Date(Math.max(new Date(t.move_in), rentStart));
-  //   // const actualEnd = new Date(Math.min(new Date(t.move_out || rentEnd), rentEnd));
-  //   // const rentDaysActive = actualEnd >= actualStart ? dateDiffInDays(actualStart, actualEnd) : 0;
-  //   // const rentShare = rentDaysActive > 0 ? (rent * rentDaysActive) / rentDays : 0;
-  //   let rentShare = 0;
-  //   const rent = parseFloat(t.rent) || 0;
-  //   const moveOutDate = t.move_out ? new Date(t.move_out) : null;
-
-  //   if (!moveOutDate) {
-  //     // No move out date → full rent
-  //     rentShare = rent;
-  //   } else {
-  //     const rentStartDate = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1); // 1st of PUB month
-  //     const rentEndDate = new Date(moveOutDate);
-  //     if (rentEndDate < rentStartDate) {
-  //       rentShare = 0; // moved out before PUB month
-  //     } else {
-  //       const daysStayed = dateDiffInDays(rentStartDate, rentEndDate);
-  //       const daysInMonth = dateDiffInDays(rentStartDate, new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0));
-  //       rentShare = (rent * daysStayed) / daysInMonth;
-  //     }
-  //   }
-
-  //   const total = rentShare + pubShare;
-
-  //   summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubShare.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
-
-  //   summaryList.push({
-  //     name: t.name,
-  //     rentShare: rentShare.toFixed(2),
-  //     pubShare: pubShare.toFixed(2),
-  //     total: total.toFixed(2),
-  //     month: monthLabel,
-  //   });
-  // });
-
-  tenantDays.forEach(({ tenant: t, days }) => {
-    const pubShare = days > 0 ? (amount * days) / pubDuration : 0;
+    const overlapDays = overlapEnd >= overlapStart ? dateDiffInDays(overlapStart, overlapEnd) : 0;
+    const pubShare = overlapDays > 0 ? (amount * overlapDays) / pubDuration : 0;
 
     let rentShare = 0;
     const rent = parseFloat(t.rent) || 0;
@@ -422,8 +375,7 @@ async function calculatePUB(forceUpdate = false) {
         rentShare = 0;
       } else {
         const daysStayed = dateDiffInDays(rentStartDate, rentEndDate);
-        const daysInMonth = dateDiffInDays(rentStartDate, new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0));
-        rentShare = (rent * daysStayed) / daysInMonth;
+        rentShare = (rent * daysStayed) / rentDaysInMonth;
       }
     }
 
@@ -440,7 +392,6 @@ async function calculatePUB(forceUpdate = false) {
     });
   });
 
-
   document.getElementById("summary-output").textContent = summary;
   contributionSummaries[monthKey] = summaryList;
 
@@ -453,6 +404,7 @@ async function calculatePUB(forceUpdate = false) {
   renderFilteredSummary();
   fetchPUBHistory();
 }
+
 
 
 function renderFilteredSummary() {
