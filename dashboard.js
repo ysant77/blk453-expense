@@ -365,26 +365,60 @@ async function calculatePUB(forceUpdate = false) {
     tenantDays.push({ tenant: t, days });
   });
 
-  tenantDays.forEach(({ tenant: t, days }) => {
-    // const rent = parseFloat(t.rent) || 0;
-    const pubShare = days > 0 && totalActiveDays > 0 ? (amount * days) / totalActiveDays : 0;
+  // tenantDays.forEach(({ tenant: t, days }) => {
+  //   // const rent = parseFloat(t.rent) || 0;
+  //   const pubShare = days > 0 && totalActiveDays > 0 ? (amount * days) / totalActiveDays : 0;
 
-    // const actualStart = new Date(Math.max(new Date(t.move_in), rentStart));
-    // const actualEnd = new Date(Math.min(new Date(t.move_out || rentEnd), rentEnd));
-    // const rentDaysActive = actualEnd >= actualStart ? dateDiffInDays(actualStart, actualEnd) : 0;
-    // const rentShare = rentDaysActive > 0 ? (rent * rentDaysActive) / rentDays : 0;
+  //   // const actualStart = new Date(Math.max(new Date(t.move_in), rentStart));
+  //   // const actualEnd = new Date(Math.min(new Date(t.move_out || rentEnd), rentEnd));
+  //   // const rentDaysActive = actualEnd >= actualStart ? dateDiffInDays(actualStart, actualEnd) : 0;
+  //   // const rentShare = rentDaysActive > 0 ? (rent * rentDaysActive) / rentDays : 0;
+  //   let rentShare = 0;
+  //   const rent = parseFloat(t.rent) || 0;
+  //   const moveOutDate = t.move_out ? new Date(t.move_out) : null;
+
+  //   if (!moveOutDate) {
+  //     // No move out date → full rent
+  //     rentShare = rent;
+  //   } else {
+  //     const rentStartDate = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1); // 1st of PUB month
+  //     const rentEndDate = new Date(moveOutDate);
+  //     if (rentEndDate < rentStartDate) {
+  //       rentShare = 0; // moved out before PUB month
+  //     } else {
+  //       const daysStayed = dateDiffInDays(rentStartDate, rentEndDate);
+  //       const daysInMonth = dateDiffInDays(rentStartDate, new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0));
+  //       rentShare = (rent * daysStayed) / daysInMonth;
+  //     }
+  //   }
+
+  //   const total = rentShare + pubShare;
+
+  //   summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubShare.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
+
+  //   summaryList.push({
+  //     name: t.name,
+  //     rentShare: rentShare.toFixed(2),
+  //     pubShare: pubShare.toFixed(2),
+  //     total: total.toFixed(2),
+  //     month: monthLabel,
+  //   });
+  // });
+
+  tenantDays.forEach(({ tenant: t, days }) => {
+    const pubShare = days > 0 ? (amount * days) / pubDuration : 0;
+
     let rentShare = 0;
     const rent = parseFloat(t.rent) || 0;
     const moveOutDate = t.move_out ? new Date(t.move_out) : null;
 
     if (!moveOutDate) {
-      // No move out date → full rent
       rentShare = rent;
     } else {
-      const rentStartDate = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1); // 1st of PUB month
+      const rentStartDate = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
       const rentEndDate = new Date(moveOutDate);
       if (rentEndDate < rentStartDate) {
-        rentShare = 0; // moved out before PUB month
+        rentShare = 0;
       } else {
         const daysStayed = dateDiffInDays(rentStartDate, rentEndDate);
         const daysInMonth = dateDiffInDays(rentStartDate, new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0));
@@ -404,6 +438,7 @@ async function calculatePUB(forceUpdate = false) {
       month: monthLabel,
     });
   });
+
 
   document.getElementById("summary-output").textContent = summary;
   contributionSummaries[monthKey] = summaryList;
