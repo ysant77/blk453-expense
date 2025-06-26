@@ -136,6 +136,120 @@ async function deleteTenant(id) {
   fetchTenants();
 }
 
+// async function calculatePUB(forceUpdate = false) {
+//   const amount = parseFloat(document.getElementById("pub-amount").value);
+//   const start = document.getElementById("pub-start").value;
+//   const end = document.getElementById("pub-end").value;
+
+//   if (!amount || !start || !end) {
+//     alert("All PUB fields are required!");
+//     return;
+//   }
+
+//   const pubStart = new Date(start);
+//   const pubEnd = new Date(end);
+
+//   if (pubEnd <= pubStart) {
+//     alert("End date must be after start date.");
+//     return;
+//   }
+
+//   if (
+//     pubStart.getMonth() === pubEnd.getMonth() &&
+//     pubStart.getFullYear() === pubEnd.getFullYear()
+//   ) {
+//     alert("Start and end date must be in different months.");
+//     return;
+//   }
+
+//   // Check for existing PUB entry
+//   const { data: existingPub, error: dupCheckError } = await supabaseClient
+//     .from("pub_bills")
+//     .select("*")
+//     .eq("start_date", start)
+//     .eq("end_date", end);
+
+//   if (dupCheckError) return console.error(dupCheckError);
+//   if (existingPub.length > 0 && !forceUpdate) {
+//     alert("PUB bill for this date range already exists.");
+//     return;
+//   }
+
+//   // Save PUB bill to DB
+//   if (existingPub.length === 0) {
+//     await supabaseClient.from("pub_bills").insert({
+//       amount,
+//       start_date: start,
+//       end_date: end,
+//     });
+//   }
+
+//   const { data: tenants } = await supabaseClient.from("tenants").select("*");
+
+//   // Filter tenants who were present during the PUB billing window
+//   const activeTenants = tenants.filter((t) => {
+//     const moveIn = new Date(t.move_in);
+//     const moveOut = t.move_out ? new Date(t.move_out) : null;
+//     return moveIn <= pubEnd && (!moveOut || moveOut >= pubStart);
+//   });
+
+//   // Determine rent period from 1st to last day of the PUB month
+//   const rentStart = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
+//   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
+//   const rentDays = dateDiffInDays(rentStart, rentEnd);
+
+//   const monthKey = `${pubStart.getFullYear()}-${String(pubStart.getMonth() + 1).padStart(2, '0')}`;
+//   const monthLabel = formatMonthYear(pubStart);
+//   const summaryList = [];
+//   let summary = `📊 Monthly Contribution Summary\n\n`;
+
+//   const pubSplitTenants = activeTenants.filter(t => {
+//     const moveIn = new Date(t.move_in);
+//     const moveOut = t.move_out ? new Date(t.move_out) : null;
+//     const overlapStart = moveIn > pubStart ? moveIn : pubStart;
+//     const overlapEnd = moveOut && moveOut < pubEnd ? moveOut : pubEnd;
+//     return overlapStart <= overlapEnd;
+//   });
+
+//   const pubPerTenant = amount / pubSplitTenants.length;
+
+//   pubSplitTenants.forEach((t) => {
+//     const moveIn = new Date(t.move_in);
+//     const moveOut = t.move_out ? new Date(t.move_out) : null;
+
+//     const actualStart = moveIn > rentStart ? moveIn : rentStart;
+//     const actualEnd = moveOut && moveOut < rentEnd ? moveOut : rentEnd;
+//     const rentActiveDays = actualEnd >= actualStart ? dateDiffInDays(actualStart, actualEnd) : 0;
+//     const rentShare = (t.rent * rentActiveDays) / rentDays;
+
+//     const total = rentShare + pubPerTenant;
+
+//     summary += `👤 ${t.name}\n  - Rent: SGD ${rentShare.toFixed(2)}\n  - PUB:  SGD ${pubPerTenant.toFixed(2)}\n  - Total: SGD ${total.toFixed(2)}\n\n`;
+
+//     summaryList.push({
+//       name: t.name,
+//       rentShare: rentShare.toFixed(2),
+//       pubShare: pubPerTenant.toFixed(2),
+//       total: total.toFixed(2),
+//       month: monthLabel,
+//     });
+//   });
+
+//   document.getElementById("summary-output").textContent = summary;
+//   contributionSummaries[monthKey] = summaryList;
+
+//   // Add to dropdown if new
+//   const monthFilter = document.getElementById("month-filter");
+//   if (![...monthFilter.options].some((opt) => opt.value === monthKey)) {
+//     monthFilter.innerHTML += `<option value="${monthKey}">${monthLabel}</option>`;
+//   }
+
+//   // Auto-select current month and render
+//   monthFilter.value = monthKey;
+//   renderFilteredSummary();
+//   fetchPUBHistory();
+// }
+
 async function calculatePUB(forceUpdate = false) {
   const amount = parseFloat(document.getElementById("pub-amount").value);
   const start = document.getElementById("pub-start").value;
@@ -244,6 +358,53 @@ async function calculatePUB(forceUpdate = false) {
 
   monthFilter.value = monthKey;
   renderFilteredSummary();
+  fetchPUBHistory();
+}
+
+
+function renderFilteredSummary() {
+  const selectedMonth = document.getElementById("month-filter").value;
+  const tbody = document.getElementById("summary-table-body");
+  tbody.innerHTML = '';
+
+  if (!selectedMonth || !contributionSummaries[selectedMonth]) return;
+
+  contributionSummaries[selectedMonth].forEach(entry => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${entry.month}</td>
+      <td>${entry.name}</td>
+      <td>${entry.rentShare}</td>
+      <td>${entry.pubShare}</td>
+      <td>${entry.total}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function fetchPUBHistory() {
+  const { data: bills, error } = await supabaseClient.from('pub_bills').select('*').order('start_date', { ascending: false });
+  if (error) return console.error(error);
+
+  const tbody = document.getElementById('pub-history-body');
+  tbody.innerHTML = '';
+
+  bills.forEach(b => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>SGD ${b.amount.toFixed(2)}</td>
+      <td>${b.start_date}</td>
+      <td>${b.end_date}</td>
+      <td><button class="danger" onclick="deletePUB('${b.id}')">Delete</button></td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+async function deletePUB(id) {
+  if (!confirm('Delete this PUB bill?')) return;
+  const { error } = await supabaseClient.from('pub_bills').delete().eq('id', id);
+  if (error) return console.error(error);
   fetchPUBHistory();
 }
 
