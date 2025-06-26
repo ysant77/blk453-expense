@@ -95,7 +95,22 @@ async function addTenant() {
     document.getElementById("pub-amount").value = activeBill.amount;
     document.getElementById("pub-start").value = activeBill.start_date;
     document.getElementById("pub-end").value = activeBill.end_date;
-    await calculatePUB(true);
+    // await calculatePUB(true);
+    const { data: updatedBills } = await supabaseClient.from('pub_bills').select('*');
+    const newMoveIn = new Date(move_in);
+
+    const matchingBill = updatedBills.find(b => {
+      const start = new Date(b.start_date);
+      const end = new Date(b.end_date);
+      return newMoveIn <= end && newMoveIn >= start;
+    });
+
+    if (matchingBill) {
+      document.getElementById("pub-amount").value = matchingBill.amount;
+      document.getElementById("pub-start").value = matchingBill.start_date;
+      document.getElementById("pub-end").value = matchingBill.end_date;
+      await calculatePUB(true);
+    }
   }
 }
 
@@ -126,6 +141,22 @@ async function saveRow(button, id) {
   if (error) return console.error('Error saving:', error);
   alert('Saved!');
   fetchTenants();
+  const { data: updatedBills } = await supabaseClient.from('pub_bills').select('*');
+  const moveIn = new Date(updated.move_in);
+
+  const matchingBill = updatedBills.find(b => {
+    const start = new Date(b.start_date);
+    const end = new Date(b.end_date);
+    return moveIn <= end && (!updated.move_out || new Date(updated.move_out) >= start);
+  });
+
+  if (matchingBill) {
+    document.getElementById("pub-amount").value = matchingBill.amount;
+    document.getElementById("pub-start").value = matchingBill.start_date;
+    document.getElementById("pub-end").value = matchingBill.end_date;
+    await calculatePUB(true);
+  }
+  
 }
 
 
@@ -134,6 +165,14 @@ async function deleteTenant(id) {
   const { error } = await supabaseClient.from('tenants').delete().eq('id', id);
   if (error) return console.error(error);
   fetchTenants();
+  const { data: updatedBills } = await supabaseClient.from('pub_bills').select('*');
+  if (updatedBills.length > 0) {
+    const latest = updatedBills[0];
+    document.getElementById("pub-amount").value = latest.amount;
+    document.getElementById("pub-start").value = latest.start_date;
+    document.getElementById("pub-end").value = latest.end_date;
+    await calculatePUB(true);
+  }
 }
 
 // async function calculatePUB(forceUpdate = false) {
