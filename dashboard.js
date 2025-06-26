@@ -346,6 +346,7 @@ async function calculatePUB(forceUpdate = false) {
   const rentStart = new Date(pubStart.getFullYear(), pubStart.getMonth(), 1);
   const rentEnd = new Date(pubStart.getFullYear(), pubStart.getMonth() + 1, 0);
   const rentDays = dateDiffInDays(rentStart, rentEnd);
+  const pubDuration = dateDiffInDays(pubStart, pubEnd); // true total days of PUB billing
 
   const monthKey = `${pubStart.getFullYear()}-${String(pubStart.getMonth() + 1).padStart(2, '0')}`;
   const monthLabel = formatMonthYear(pubStart);
